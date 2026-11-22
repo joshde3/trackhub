@@ -33,6 +33,15 @@ jobs:
           path: "**/target/site/jacoco/"
           if-no-files-found: ignore
 
+  image:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Proves the Dockerfile Railway will use still builds; the image is not pushed anywhere.
+      - name: Build image
+        run: docker build --tag trackhub:ci .
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

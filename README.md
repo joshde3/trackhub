@@ -6,7 +6,7 @@ normalizes their statuses into one state machine, and notifies you when somethin
 It is a portfolio project, so it favours clean architecture, tests, and measured engineering
 decisions over feature count. Every significant choice is recorded in [`docs/decisions`](docs/decisions).
 
-> Status: Phase 1 in progress (core domain + first carrier adapter).
+> Status: Phase 1 complete (backend: domain, 17TRACK, API, webhooks, cache). Phase 2 next.
 
 ## Architecture
 
@@ -44,6 +44,13 @@ curl localhost:8080/actuator/health
 The app refuses to start without `GOOGLE_CLIENT_ID` and `TRACK17_API_KEY`. Tests need neither
 (they use fakes), but they do need Docker for Postgres.
 
+### With Docker
+
+```bash
+cp .env.example .env      # fill in GOOGLE_CLIENT_ID and TRACK17_API_KEY
+docker compose up --build # Postgres + the app, capped at 512 MB like a small Railway service
+```
+
 ## API
 
 Interactive docs at `http://localhost:8080/swagger-ui.html`; the OpenAPI document is at
@@ -61,6 +68,27 @@ Interactive docs at `http://localhost:8080/swagger-ui.html`; the OpenAPI documen
 Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem documents with a stable
 `code`, for example `already-tracking` (409), `unknown-tracking-number` (422) and
 `carrier-unavailable` (503 with `Retry-After`).
+
+## Phase 1 results
+
+Measured on 2026-11-22. Environment: a 4-CPU cloud container; the app, Postgres (Testcontainers)
+and k6 all on the same machine; carrier replaced by a fake that answers in 300 ms; tokens signed
+locally but checked by the same claim rules. Numbers from a real phone over the internet will be
+higher. Reproduce with [`loadtest/`](loadtest/README.md).
+
+| What | Result | How |
+|---|---|---|
+| Domain test coverage | 95.5% lines, 96.6% branches (gate: 80%) | JaCoCo, `mvn verify` |
+| Carrier module coverage | 96.3% lines, 88.9% branches (gate: 80%) | JaCoCo, WireMock-backed tests |
+| Domain test suite runtime | 1.4 s for 71 tests | Surefire report |
+| Cache hit rate | 98.2% (5,338 hits, 100 misses) | k6: 20 users, 60 s |
+| Carrier calls | 100 for 16,117 requests (one per parcel added) | `trackhub.carrier.calls` |
+| Refresh, cache hit | p50 6.7 ms, p95 13 ms | k6 |
+| Add parcel, carrier called | p50 348 ms, p95 744 ms (300 ms of it is the carrier) | k6 |
+| List / get parcel | p95 7.3 ms / 9.4 ms | k6 |
+| Throughput | 268 requests/s with zero errors | k6 |
+| Duplicate webhooks | 10 identical deliveries at once: 1 applied, 9 absorbed, events stored once | `WebhookTest` |
+| Startup and idle memory | 6.5 s to start; 250 MiB used in a 512 MiB container | Docker image, `docker stats` |
 
 ## Observability
 
