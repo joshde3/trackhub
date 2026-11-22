@@ -9,6 +9,24 @@ spring:
   threads:
     virtual:
       enabled: true
+  # Railway's Postgres exposes PGHOST, PGPORT, PGDATABASE, PGUSER and PGPASSWORD; the defaults
+  # match the local docker-compose database.
+  datasource:
+    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:trackhub}
+    username: ${PGUSER:trackhub}
+    password: ${PGPASSWORD:}
+    hikari:
+      # Small pool: one instance, low traffic, and every connection costs memory on the $5 plan.
+      maximum-pool-size: 5
+  jpa:
+    hibernate:
+      # Flyway owns the schema; Hibernate only checks the entities match it (ADR 0011).
+      ddl-auto: validate
+    # No database access from controllers or JSON rendering: queries happen in the service layer,
+    # where they are visible and tested, not lazily while a response is written.
+    open-in-view: false
+  flyway:
+    locations: classpath:db/migration
 
 server:
   port: ${PORT:8080}

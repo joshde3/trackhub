@@ -27,6 +27,12 @@ public final class Shipment {
     private final CarrierCode carrier;
     private final TrackingNumber trackingNumber;
     private final Instant createdAt;
+    /**
+     * Optimistic-lock version from storage; null for a shipment never saved. The domain never
+     * reads it: it only carries it from load to save so that two concurrent updates of the same
+     * parcel (a webhook and a refresh) cannot silently overwrite each other.
+     */
+    private final Long version;
 
     private ShipmentStatus status;
     private Instant statusChangedAt;
@@ -42,10 +48,12 @@ public final class Shipment {
             CarrierCode carrier,
             TrackingNumber trackingNumber,
             Instant createdAt,
+            Long version,
             ShipmentStatus status,
             Instant statusChangedAt,
             Instant statusEventAt,
             List<TrackingEvent> events) {
+        this.version = version;
         this.id = Objects.requireNonNull(id, "id");
         this.ownerId = Objects.requireNonNull(ownerId, "ownerId");
         this.carrier = Objects.requireNonNull(carrier, "carrier");
@@ -67,7 +75,7 @@ public final class Shipment {
             UUID ownerId, CarrierCode carrier, TrackingNumber trackingNumber, Clock clock) {
         Instant now = clock.instant();
         return new Shipment(
-                UUID.randomUUID(), ownerId, carrier, trackingNumber, now,
+                UUID.randomUUID(), ownerId, carrier, trackingNumber, now, null,
                 ShipmentStatus.CREATED, now, null, List.of());
     }
 
@@ -78,11 +86,12 @@ public final class Shipment {
             CarrierCode carrier,
             TrackingNumber trackingNumber,
             Instant createdAt,
+            long version,
             ShipmentStatus status,
             Instant statusChangedAt,
             Instant statusEventAt,
             List<TrackingEvent> events) {
-        return new Shipment(id, ownerId, carrier, trackingNumber, createdAt,
+        return new Shipment(id, ownerId, carrier, trackingNumber, createdAt, version,
                 status, statusChangedAt, statusEventAt, events);
     }
 
@@ -154,6 +163,11 @@ public final class Shipment {
 
     public Instant createdAt() {
         return createdAt;
+    }
+
+    /** Storage version, empty if this shipment has never been saved. */
+    public Optional<Long> version() {
+        return Optional.ofNullable(version);
     }
 
     public ShipmentStatus status() {
