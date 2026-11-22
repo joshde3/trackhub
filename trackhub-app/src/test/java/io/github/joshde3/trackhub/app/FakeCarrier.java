@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** An in-memory carrier for API tests: each test says what the carrier knows about a number. */
 public final class FakeCarrier implements CarrierAdapter {
@@ -26,6 +27,12 @@ public final class FakeCarrier implements CarrierAdapter {
 
     private final Map<TrackingNumber, Answer> answers = new ConcurrentHashMap<>();
     private final Map<TrackingNumber, Runnable> whileTracking = new ConcurrentHashMap<>();
+    private final Map<TrackingNumber, AtomicInteger> calls = new ConcurrentHashMap<>();
+
+    /** How many times the carrier was really asked about this number (cache misses). */
+    public int callsFor(TrackingNumber number) {
+        return calls.getOrDefault(number, new AtomicInteger()).get();
+    }
 
     /** Runs {@code action} during the next call for this number, e.g. a webhook saving meanwhile. */
     public void duringNextCall(TrackingNumber number, Runnable action) {
@@ -56,6 +63,7 @@ public final class FakeCarrier implements CarrierAdapter {
 
     @Override
     public TrackingSnapshot track(TrackingNumber number) {
+        calls.computeIfAbsent(number, n -> new AtomicInteger()).incrementAndGet();
         Runnable action = whileTracking.remove(number);
         if (action != null) {
             action.run();

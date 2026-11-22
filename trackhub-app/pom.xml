@@ -40,6 +40,20 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
+        <!-- In-process cache of carrier answers, TTL by parcel status (ADR 0006). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <!-- Metrics pushed over OTLP to Grafana Cloud's free tier when OTLP_METRICS_URL is set. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-otlp</artifactId>
+        </dependency>
         <!-- OpenAPI document and Swagger UI generated from the controllers. -->
         <dependency>
             <groupId>org.springdoc</groupId>

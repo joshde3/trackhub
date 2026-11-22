@@ -62,6 +62,15 @@ Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem documents 
 `code`, for example `already-tracking` (409), `unknown-tracking-number` (422) and
 `carrier-unavailable` (503 with `Retry-After`).
 
+## Observability
+
+- **Logs:** one JSON object per line (ECS). Every request has an `X-Request-Id`, returned to the
+  caller and present on every log line it caused. Set `LOG_FORMAT=` (empty) for readable local logs.
+- **Health:** `/actuator/health`, plus `/liveness` and `/readiness` probes for Railway.
+- **Metrics:** pushed over OTLP to Grafana Cloud when `OTLP_METRICS_ENABLED=true`. Includes request
+  and carrier-call latency histograms (`http.server.requests`, `trackhub.carrier.calls`), cache
+  hits and misses (`cache.gets`) and webhook outcomes (`trackhub.webhooks`).
+
 ## Secrets
 
 This repository is public. Secrets are only ever read from environment variables; `application.yml`

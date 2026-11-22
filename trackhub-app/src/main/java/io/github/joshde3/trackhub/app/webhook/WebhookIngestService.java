@@ -1,6 +1,7 @@
 package io.github.joshde3.trackhub.app.webhook;
 
 import io.github.joshde3.trackhub.app.persistence.WebhookDeliveries;
+import io.github.joshde3.trackhub.app.shipment.CarrierLookup;
 import io.github.joshde3.trackhub.domain.port.ShipmentRepository;
 import io.github.joshde3.trackhub.domain.port.ShipmentRepository.ConcurrentUpdateException;
 import io.github.joshde3.trackhub.domain.port.WebhookNotification;
@@ -30,14 +31,26 @@ public class WebhookIngestService {
     private final WebhookDeliveries deliveries;
     private final ShipmentRepository shipments;
     private final TransactionTemplate transaction;
+    private final CarrierLookup lookup;
 
-    WebhookIngestService(WebhookDeliveries deliveries, ShipmentRepository shipments, TransactionTemplate transaction) {
+    WebhookIngestService(
+            WebhookDeliveries deliveries, ShipmentRepository shipments, TransactionTemplate transaction, CarrierLookup lookup) {
         this.deliveries = deliveries;
         this.shipments = shipments;
         this.transaction = transaction;
+        this.lookup = lookup;
     }
 
     public Outcome ingest(CarrierCode carrier, WebhookNotification notification) {
+        Outcome outcome = ingestWithRetry(carrier, notification);
+        if (outcome == Outcome.APPLIED && notification instanceof WebhookNotification.Updated updated) {
+            // After commit, so the cache never shows something the database rolled back.
+            lookup.remember(carrier, updated.snapshot());
+        }
+        return outcome;
+    }
+
+    private Outcome ingestWithRetry(CarrierCode carrier, WebhookNotification notification) {
         try {
             return transaction.execute(status -> ingestOnce(carrier, notification));
         } catch (ConcurrentUpdateException e) {

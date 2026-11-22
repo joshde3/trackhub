@@ -7,6 +7,10 @@ import io.github.joshde3.trackhub.app.FakeCarrierConfiguration;
 import io.github.joshde3.trackhub.app.PostgresTestConfiguration;
 import io.github.joshde3.trackhub.carriers.track17.Track17Adapter;
 import io.github.joshde3.trackhub.app.persistence.WebhookDeliveries;
+import io.github.joshde3.trackhub.app.shipment.CarrierLookup;
+import io.github.joshde3.trackhub.app.shipment.TrackingCache;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.github.joshde3.trackhub.domain.port.TrackingSnapshot;
 import io.github.joshde3.trackhub.domain.port.ShipmentRepository;
 import io.github.joshde3.trackhub.domain.port.ShipmentRepository.ConcurrentUpdateException;
 import io.github.joshde3.trackhub.domain.port.WebhookNotification;
@@ -37,6 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import org.springframework.cache.CacheManager;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -58,6 +63,9 @@ class WebhookTest {
     @Autowired private WebhookDeliveries deliveries;
     @Autowired private TransactionTemplate transaction;
     @Autowired private Track17Adapter track17;
+    @Autowired private CarrierLookup lookup;
+    @Autowired private CacheManager caches;
+    @Autowired private MeterRegistry metrics;
 
     private final HttpClient client = HttpClient.newHttpClient();
     private TrackingNumber number;
@@ -129,11 +137,27 @@ class WebhookTest {
     }
 
     @Test
+    void cachesTheWebhooksAnswerSoTheNextRefreshNeedsNoCarrierCall() throws Exception {
+        trackedBy();
+
+        deliver(updated());
+
+        TrackingSnapshot cached = caches.getCache(TrackingCache.NAME)
+                .get("track17:" + number.value(), TrackingSnapshot.class);
+        assertThat(cached).isNotNull();
+        assertThat(cached.events()).hasSize(2);
+    }
+
+    @Test
     void absorbsARetriedDelivery() throws Exception {
         UUID shipment = trackedBy();
+        double duplicatesBefore = metrics.counter("trackhub.webhooks", "carrier", "track17", "result", "duplicate").count();
 
         deliver(updated());
         HttpResponse<String> retry = deliver(updated());
+
+        assertThat(metrics.counter("trackhub.webhooks", "carrier", "track17", "result", "duplicate").count() - duplicatesBefore)
+                .isEqualTo(1);
 
         assertThat(retry.statusCode()).isEqualTo(200);
         assertThat(retry.body()).contains("duplicate");
@@ -247,7 +271,7 @@ class WebhookTest {
         });
 
         WebhookIngestService.Outcome outcome =
-                new WebhookIngestService(deliveries, losesTheFirstRace, transaction).ingest(Track17Adapter.CODE, parsed());
+                new WebhookIngestService(deliveries, losesTheFirstRace, transaction, lookup).ingest(Track17Adapter.CODE, parsed());
 
         // APPLIED, not DUPLICATE: the first attempt's delivery row was rolled back with it.
         assertThat(outcome).isEqualTo(WebhookIngestService.Outcome.APPLIED);
@@ -263,12 +287,12 @@ class WebhookTest {
             throw new IllegalStateException("database fell over");
         });
 
-        assertThatThrownBy(() -> new WebhookIngestService(deliveries, broken, transaction).ingest(Track17Adapter.CODE, parsed()))
+        assertThatThrownBy(() -> new WebhookIngestService(deliveries, broken, transaction, lookup).ingest(Track17Adapter.CODE, parsed()))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(deliveriesFor(number)).isZero();
 
         // The carrier retries the same delivery later, and this time it is applied.
-        assertThat(new WebhookIngestService(deliveries, shipments, transaction).ingest(Track17Adapter.CODE, parsed()))
+        assertThat(new WebhookIngestService(deliveries, shipments, transaction, lookup).ingest(Track17Adapter.CODE, parsed()))
                 .isEqualTo(WebhookIngestService.Outcome.APPLIED);
         assertThat(eventsOf(shipment)).isEqualTo(2);
     }
