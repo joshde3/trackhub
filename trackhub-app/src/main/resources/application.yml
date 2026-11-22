@@ -1,0 +1,24 @@
+# Configuration only. Secrets are NEVER written here: every secret is read from an environment
+# variable (see .env.example). This file is safe to commit to a public repository.
+spring:
+  application:
+    name: trackhub
+  profiles:
+    # Both halves run in one container in production to fit the $5 budget (ADR 0001).
+    active: ${TRACKHUB_PROFILES:api,worker}
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
