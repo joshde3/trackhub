@@ -31,6 +31,21 @@ spring:
 server:
   port: ${PORT:8080}
 
+trackhub:
+  google:
+    # The OAuth client id that Google puts in the token's "aud" claim. For Android this is the
+    # *web* client id passed to requestIdToken(), not the Android client id (ADR 0014).
+    client-id: ${GOOGLE_CLIENT_ID:}
+    jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+  track17:
+    base-url: https://api.17track.net/track/v2.4
+    api-key: ${TRACK17_API_KEY:}
+    timeout: 5s
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
 management:
   endpoints:
     web:

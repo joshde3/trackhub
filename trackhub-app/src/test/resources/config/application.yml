@@ -1,0 +1,9 @@
+# Test-only overrides, layered on top of the main application.yml. Fake values only: tests never
+# call Google or 17TRACK (security is exercised with spring-security-test's jwt(), carriers with
+# a fake adapter).
+trackhub:
+  google:
+    client-id: test-client-id.apps.googleusercontent.com
+  track17:
+    api-key: test-key-not-real
+    base-url: http://localhost:1/track/v2.4
