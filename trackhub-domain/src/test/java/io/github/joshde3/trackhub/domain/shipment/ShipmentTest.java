@@ -38,6 +38,7 @@ class ShipmentTest {
             assertThat(shipment.createdAt()).isEqualTo(ADDED_AT);
             assertThat(shipment.statusEventAt()).isEmpty();
             assertThat(shipment.events()).isEmpty();
+            assertThat(shipment.version()).isEmpty();
         }
     }
 
@@ -193,11 +194,12 @@ class ShipmentTest {
 
             var restored = Shipment.restore(
                     shipment.id(), shipment.ownerId(), shipment.carrier(), shipment.trackingNumber(),
-                    ADDED_AT, OUT_FOR_DELIVERY, ofdAt, ofdAt, stored);
+                    ADDED_AT, 3L, OUT_FOR_DELIVERY, ofdAt, ofdAt, stored);
 
             assertThat(restored.events()).extracting(TrackingEvent::normalizedStatus)
                     .containsExactly(IN_TRANSIT, OUT_FOR_DELIVERY);
             assertThat(restored.statusEventAt()).contains(ofdAt);
+            assertThat(restored.version()).contains(3L);
             assertThat(restored.applyEvents(List.of(event("2026-11-20T20:00:00Z", EXCEPTION)))).isEmpty();
         }
 
