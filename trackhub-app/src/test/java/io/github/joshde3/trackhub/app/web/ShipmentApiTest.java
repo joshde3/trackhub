@@ -4,6 +4,7 @@ import static io.github.joshde3.trackhub.domain.shipment.ShipmentStatus.IN_TRANS
 import static io.github.joshde3.trackhub.domain.shipment.ShipmentStatus.OUT_FOR_DELIVERY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -17,6 +18,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.joshde3.trackhub.app.FakeCarrier;
 import io.github.joshde3.trackhub.app.FakeCarrierConfiguration;
 import io.github.joshde3.trackhub.app.PostgresTestConfiguration;
+import io.github.joshde3.trackhub.app.shipment.TrackingCache;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.github.joshde3.trackhub.domain.port.ShipmentRepository;
 import io.github.joshde3.trackhub.domain.shipment.Shipment;
 import io.github.joshde3.trackhub.domain.shipment.ShipmentStatus;
@@ -32,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -50,6 +54,8 @@ class ShipmentApiTest {
     @Autowired private ObjectMapper json;
     @Autowired private ShipmentRepository repository;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private CacheManager caches;
+    @Autowired private MeterRegistry metrics;
 
     private RequestPostProcessor alice;
     private RequestPostProcessor bob;
@@ -70,6 +76,11 @@ class ShipmentApiTest {
         alice = user("alice");
         bob = user("bob");
         number = TrackingNumber.of("RR" + NUMBERS.incrementAndGet() + "000IN");
+    }
+
+    /** Lets the cached carrier answer expire, as if its TTL had passed. */
+    private void cacheExpires() {
+        caches.getCache(TrackingCache.NAME).clear();
     }
 
     private MockHttpServletRequestBuilder addRequest(String body) {
@@ -177,6 +188,7 @@ class ShipmentApiTest {
         carrier.knows(number, event("2026-11-20T12:00:00Z", "IT", IN_TRANSIT));
         String id = add(alice, number.value()).path("id").asText();
         carrier.knows(number, event("2026-11-20T12:00:00Z", "IT", IN_TRANSIT), event("2026-11-21T08:00:00Z", "OFD", OUT_FOR_DELIVERY));
+        cacheExpires();
 
         http.perform(post("/api/shipments/" + id + "/refresh").with(alice))
                 .andExpect(status().isOk())
@@ -185,9 +197,53 @@ class ShipmentApiTest {
     }
 
     @Test
+    void refreshingAgainWithinTheTtlDoesNotCallTheCarrier() throws Exception {
+        carrier.knows(number, event("2026-11-20T12:00:00Z", "IT", IN_TRANSIT));
+        String id = add(alice, number.value()).path("id").asText();
+        double callsBefore = carrierCalls();
+
+        for (int i = 0; i < 3; i++) {
+            http.perform(post("/api/shipments/" + id + "/refresh").with(alice)).andExpect(status().isOk());
+        }
+
+        assertThat(carrier.callsFor(number)).isEqualTo(1);
+        assertThat(carrierCalls() - callsBefore).isZero();
+    }
+
+    private double carrierCalls() {
+        return metrics.find("trackhub.carrier.calls").tag("carrier", "fake").timers().stream()
+                .mapToDouble(timer -> timer.count()).sum();
+    }
+
+    @Test
+    void neverCachesAFailure() throws Exception {
+        carrier.isDownFor(number);
+        String id = add(alice, number.value()).path("id").asText();
+        cacheExpires();
+
+        http.perform(post("/api/shipments/" + id + "/refresh").with(alice)).andExpect(status().isServiceUnavailable());
+        carrier.knows(number, event("2026-11-20T12:00:00Z", "IT", IN_TRANSIT));
+
+        http.perform(post("/api/shipments/" + id + "/refresh").with(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_TRANSIT"));
+    }
+
+    @Test
+    void tagsEveryResponseWithARequestId() throws Exception {
+        http.perform(get("/api/shipments").with(alice)).andExpect(header().string("X-Request-Id", matchesPattern("[0-9a-f-]{36}")));
+        http.perform(get("/api/shipments").with(alice).header("X-Request-Id", "app-1234-abcd"))
+                .andExpect(header().string("X-Request-Id", "app-1234-abcd"));
+        // A hostile id (log injection) is replaced, not echoed.
+        http.perform(get("/api/shipments").with(alice).header("X-Request-Id", "x\n{\"level\":\"ERROR\"}"))
+                .andExpect(header().string("X-Request-Id", matchesPattern("[0-9a-f-]{36}")));
+    }
+
+    @Test
     void refreshKeepsAWebhookUpdateThatLandedWhileItWaitedOnTheCarrier() throws Exception {
         String id = add(alice, number.value()).path("id").asText();
         carrier.knows(number, event("2026-11-21T08:00:00Z", "OFD", OUT_FOR_DELIVERY));
+        cacheExpires();
         // While refresh waits on the carrier, a webhook saves a scan the carrier call won't return.
         carrier.duringNextCall(number, () -> {
             Shipment fromWebhook = repository.findForOwner(UUID.fromString(id), ownerOf(id)).orElseThrow();
@@ -210,6 +266,7 @@ class ShipmentApiTest {
     void tellsTheClientWhenToRetryIfTheCarrierIsDown() throws Exception {
         String id = add(alice, number.value()).path("id").asText();
         carrier.isDownFor(number);
+        cacheExpires();
 
         http.perform(post("/api/shipments/" + id + "/refresh").with(alice))
                 .andExpect(status().isServiceUnavailable())

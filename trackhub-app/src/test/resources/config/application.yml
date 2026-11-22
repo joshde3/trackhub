@@ -7,3 +7,9 @@ trackhub:
   track17:
     api-key: test-key-not-real
     base-url: http://localhost:1/track/v2.4
+
+# Readable test output; production logs are JSON (see main application.yml).
+logging:
+  structured:
+    format:
+      console: ""

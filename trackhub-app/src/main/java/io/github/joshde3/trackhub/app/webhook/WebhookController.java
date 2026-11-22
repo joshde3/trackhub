@@ -4,12 +4,14 @@ import io.github.joshde3.trackhub.carriers.CarrierRegistry;
 import io.github.joshde3.trackhub.domain.port.WebhookCapable;
 import io.github.joshde3.trackhub.domain.port.WebhookNotification;
 import io.github.joshde3.trackhub.domain.shipment.CarrierCode;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,10 +35,12 @@ class WebhookController {
 
     private final CarrierRegistry carriers;
     private final WebhookIngestService ingest;
+    private final MeterRegistry metrics;
 
-    WebhookController(CarrierRegistry carriers, WebhookIngestService ingest) {
+    WebhookController(CarrierRegistry carriers, WebhookIngestService ingest, MeterRegistry metrics) {
         this.carriers = carriers;
         this.ingest = ingest;
+        this.metrics = metrics;
     }
 
     @PostMapping("/webhooks/{carrier}")
@@ -53,7 +57,7 @@ class WebhookController {
         byte[] raw = body == null ? new byte[0] : body;
         if (!receiver.get().verifySignature(headers, raw)) {
             LOG.warn("Rejected {} webhook with a bad signature", carrier);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            return count(code.get(), "rejected", ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
         }
 
         Optional<WebhookNotification> notification;
@@ -62,16 +66,28 @@ class WebhookController {
         } catch (IllegalArgumentException e) {
             // Signed by the carrier but not something we understand: retrying won't help.
             LOG.warn("Unparseable {} webhook: {}", carrier, e.getMessage());
-            return ResponseEntity.badRequest().body(new Result("unparseable"));
+            return count(code.get(), "unparseable", ResponseEntity.badRequest().body(new Result("unparseable")));
         }
         if (notification.isEmpty()) {
-            return ResponseEntity.ok(new Result("ignored"));
+            return count(code.get(), "ignored", ResponseEntity.ok(new Result("ignored")));
         }
-        // Exceptions from here propagate as 500 so the carrier retries; the transaction rolled back.
-        return switch (ingest.ingest(code.get(), notification.get())) {
-            case APPLIED -> ResponseEntity.ok(new Result("applied"));
-            case DUPLICATE -> ResponseEntity.ok(new Result("duplicate"));
-        };
+        MDC.put("deliveryId", notification.get().deliveryId());
+        try {
+            // Exceptions from here propagate as 500 so the carrier retries; the transaction rolled back.
+            String result = switch (ingest.ingest(code.get(), notification.get())) {
+                case APPLIED -> "applied";
+                case DUPLICATE -> "duplicate";
+            };
+            return count(code.get(), result, ResponseEntity.ok(new Result(result)));
+        } finally {
+            MDC.remove("deliveryId");
+        }
+    }
+
+    /** {@code trackhub.webhooks{carrier,result}}: duplicates absorbed is one of the Phase 1 numbers. */
+    private <T> ResponseEntity<T> count(CarrierCode carrier, String result, ResponseEntity<T> response) {
+        metrics.counter("trackhub.webhooks", "carrier", carrier.value(), "result", result).increment();
+        return response;
     }
 
     private static Optional<CarrierCode> parse(String carrier) {

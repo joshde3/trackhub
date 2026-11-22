@@ -55,3 +55,28 @@ management:
     health:
       probes:
         enabled: true
+  # Metrics are pushed, not scraped: Grafana Cloud's free tier takes OTLP, and nothing has to reach
+  # into the container. Off unless OTLP_METRICS_URL is set (ADR 0006).
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTLP_METRICS_ENABLED:false}
+        url: ${OTLP_METRICS_URL:http://localhost:4318/v1/metrics}
+        step: 60s
+        headers:
+          Authorization: ${OTLP_AUTH_HEADER:}
+  metrics:
+    tags:
+      application: trackhub
+    distribution:
+      # Lets Grafana compute p50/p95/p99 for request and carrier-call latency.
+      percentiles-histogram:
+        http.server.requests: true
+        trackhub.carrier.calls: true
+
+logging:
+  structured:
+    format:
+      # One JSON object per line (Elastic Common Schema), including MDC fields such as requestId.
+      # Set LOG_FORMAT to empty in .env for classic readable lines when running locally.
+      console: ${LOG_FORMAT:ecs}

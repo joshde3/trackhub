@@ -29,11 +29,13 @@ public class ShipmentService {
 
     private final ShipmentRepository shipments;
     private final CarrierRegistry carriers;
+    private final CarrierLookup lookup;
     private final Clock clock;
 
-    ShipmentService(ShipmentRepository shipments, CarrierRegistry carriers, Clock clock) {
+    ShipmentService(ShipmentRepository shipments, CarrierRegistry carriers, CarrierLookup lookup, Clock clock) {
         this.shipments = shipments;
         this.carriers = carriers;
+        this.lookup = lookup;
         this.clock = clock;
     }
 
@@ -56,7 +58,7 @@ public class ShipmentService {
 
         Shipment shipment = Shipment.register(ownerId, adapter.code(), number, clock);
         try {
-            shipment.applyEvents(adapter.track(number).events());
+            shipment.applyEvents(lookup.track(adapter, number).events());
         } catch (CarrierUnavailableException e) {
             LOG.warn("Carrier {} unavailable while adding {}; saving without events: {}", adapter.code(), number, e.getMessage());
         }
@@ -76,7 +78,8 @@ public class ShipmentService {
         Shipment shipment = get(ownerId, shipmentId);
         CarrierAdapter adapter = carriers.byCode(shipment.carrier())
                 .orElseThrow(() -> new UnknownCarrierException(shipment.carrier().value()));
-        TrackingSnapshot snapshot = adapter.track(shipment.trackingNumber());
+        // Within the TTL this is served from the cache: a user tapping refresh repeatedly costs no quota.
+        TrackingSnapshot snapshot = lookup.track(adapter, shipment.trackingNumber());
         shipment.applyEvents(snapshot.events());
         try {
             return shipments.save(shipment);
