@@ -3,6 +3,7 @@ package io.github.joshde3.trackhub.domain.port;
 import io.github.joshde3.trackhub.domain.shipment.CarrierCode;
 import io.github.joshde3.trackhub.domain.shipment.Shipment;
 import io.github.joshde3.trackhub.domain.shipment.TrackingNumber;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +27,13 @@ public interface ShipmentRepository {
     Optional<Shipment> findForOwner(UUID shipmentId, UUID ownerId);
 
     Optional<Shipment> findByTracking(UUID ownerId, CarrierCode carrier, TrackingNumber trackingNumber);
+
+    /**
+     * Every user's copy of one parcel. The one lookup without an owner, and only for carrier
+     * webhooks: the carrier tells us about a parcel, not a user, and two users may track it.
+     * Never expose its result to an API caller without filtering by owner.
+     */
+    List<Shipment> findAllTracking(CarrierCode carrier, TrackingNumber trackingNumber);
 
     /** The owner already tracks this parcel. Maps to HTTP 409 at the API. */
     final class DuplicateShipmentException extends RuntimeException {

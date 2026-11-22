@@ -115,6 +115,19 @@ class JpaShipmentRepositoryTest {
     }
 
     @Test
+    void findsEveryUsersCopyOfAParcelForWebhooks() {
+        UUID otherOwner = UUID.randomUUID();
+        jdbc.update("INSERT INTO users (id, google_sub, email) VALUES (?, ?, ?)",
+                otherOwner, "sub-" + otherOwner, otherOwner + "@example.com");
+        TrackingNumber shared = TrackingNumber.of("CP" + UUID.randomUUID().toString().substring(0, 8).toUpperCase() + "CN");
+        repository.save(Shipment.register(owner, TRACK17, shared, Clock.systemUTC()));
+        repository.save(Shipment.register(otherOwner, TRACK17, shared, Clock.systemUTC()));
+
+        assertThat(repository.findAllTracking(TRACK17, shared)).extracting(Shipment::ownerId)
+                .containsExactlyInAnyOrder(owner, otherOwner);
+    }
+
+    @Test
     void detectsALostUpdate() {
         Shipment saved = repository.save(Shipment.register(owner, TRACK17, NUMBER, Clock.systemUTC()));
         // Two requests load the same version...

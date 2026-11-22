@@ -4,6 +4,7 @@ import io.github.joshde3.trackhub.domain.port.ShipmentRepository;
 import io.github.joshde3.trackhub.domain.shipment.CarrierCode;
 import io.github.joshde3.trackhub.domain.shipment.Shipment;
 import io.github.joshde3.trackhub.domain.shipment.TrackingNumber;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -75,6 +76,14 @@ class JpaShipmentRepository implements ShipmentRepository {
     public Optional<Shipment> findByTracking(UUID ownerId, CarrierCode carrier, TrackingNumber trackingNumber) {
         return jpa.findByUserIdAndCarrierCodeAndTrackingNumber(ownerId, carrier.value(), trackingNumber.value())
                 .map(ShipmentMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Shipment> findAllTracking(CarrierCode carrier, TrackingNumber trackingNumber) {
+        return jpa.findByCarrierCodeAndTrackingNumber(carrier.value(), trackingNumber.value()).stream()
+                .map(ShipmentMapper::toDomain)
+                .toList();
     }
 
     private static boolean violated(DataIntegrityViolationException e, String constraint) {
