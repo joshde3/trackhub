@@ -1,0 +1,17 @@
+# Build output
+target/
+*.class
+
+# Secrets: real values live only in .env (never committed) and in Railway variables
+.env
+.env.*
+!.env.example
+
+# IDEs and OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Logs
+*.log
