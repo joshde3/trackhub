@@ -56,6 +56,7 @@ Interactive docs at `http://localhost:8080/swagger-ui.html`; the OpenAPI documen
 | `GET /api/shipments?page=0&size=20` | Your parcels, newest first |
 | `GET /api/shipments/{id}` | One parcel with its timeline |
 | `POST /api/shipments/{id}/refresh` | Ask the carrier for news now |
+| `POST /webhooks/{carrier}` | Carrier pushes; signed by the carrier instead of Google sign-in ([ADR 0005](docs/decisions/0005-idempotent-webhooks.md)) |
 
 Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem documents with a stable
 `code`, for example `already-tracking` (409), `unknown-tracking-number` (422) and

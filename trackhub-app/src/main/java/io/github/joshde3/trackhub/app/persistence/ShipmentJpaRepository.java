@@ -1,5 +1,6 @@
 package io.github.joshde3.trackhub.app.persistence;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -15,4 +16,7 @@ interface ShipmentJpaRepository extends JpaRepository<ShipmentEntity, UUID> {
     @EntityGraph(attributePaths = "events")
     Optional<ShipmentEntity> findByUserIdAndCarrierCodeAndTrackingNumber(
             UUID userId, String carrierCode, String trackingNumber);
+
+    @EntityGraph(attributePaths = "events")
+    List<ShipmentEntity> findByCarrierCodeAndTrackingNumber(String carrierCode, String trackingNumber);
 }
