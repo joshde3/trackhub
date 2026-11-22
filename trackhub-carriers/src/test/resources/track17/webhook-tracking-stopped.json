@@ -1,0 +1,4 @@
+{
+  "event": "TRACKING_STOPPED",
+  "data": { "number": "RR123456789IN", "carrier": 9201, "param": null, "tag": "" }
+}
