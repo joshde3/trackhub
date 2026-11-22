@@ -41,6 +41,26 @@ mvn -pl trackhub-app spring-boot:run
 curl localhost:8080/actuator/health
 ```
 
+The app refuses to start without `GOOGLE_CLIENT_ID` and `TRACK17_API_KEY`. Tests need neither
+(they use fakes), but they do need Docker for Postgres.
+
+## API
+
+Interactive docs at `http://localhost:8080/swagger-ui.html`; the OpenAPI document is at
+`/v3/api-docs`. Every `/api` call needs a Google ID token as the bearer token
+([ADR 0014](docs/decisions/0014-google-id-tokens.md)).
+
+| Method and path | What it does |
+|---|---|
+| `POST /api/shipments` | Start tracking a number; the carrier is detected if not given |
+| `GET /api/shipments?page=0&size=20` | Your parcels, newest first |
+| `GET /api/shipments/{id}` | One parcel with its timeline |
+| `POST /api/shipments/{id}/refresh` | Ask the carrier for news now |
+
+Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem documents with a stable
+`code`, for example `already-tracking` (409), `unknown-tracking-number` (422) and
+`carrier-unavailable` (503 with `Retry-After`).
+
 ## Secrets
 
 This repository is public. Secrets are only ever read from environment variables; `application.yml`
