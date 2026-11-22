@@ -23,6 +23,11 @@
             <groupId>io.github.joshde3.trackhub</groupId>
             <artifactId>trackhub-domain</artifactId>
         </dependency>
+        <!-- JSON parsing for carrier responses. HTTP uses the JDK's java.net.http client. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -31,6 +36,12 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Fake carrier servers in tests: no network, no API key (ADR 0003). -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

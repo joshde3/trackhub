@@ -33,6 +33,7 @@
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <archunit.version>1.5.1</archunit.version>
+        <wiremock.version>3.13.1</wiremock.version>
         <jacoco.version>0.8.16</jacoco.version>
         <!-- Modules that hold business rules raise this to 0.80 (see ADR 0002). -->
         <coverage.minimum>0.00</coverage.minimum>
@@ -49,6 +50,12 @@
                 <groupId>io.github.joshde3.trackhub</groupId>
                 <artifactId>trackhub-carriers</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.wiremock</groupId>
+                <artifactId>wiremock-standalone</artifactId>
+                <version>${wiremock.version}</version>
+                <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>com.tngtech.archunit</groupId>

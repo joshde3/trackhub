@@ -1,0 +1,57 @@
+{
+  "event": "TRACKING_UPDATED",
+  "data": {
+    "number": "RR123456789IN",
+    "carrier": 9201,
+    "param": null,
+    "tag": "",
+    "track_info": {
+      "latest_status": { "status": "InTransit", "sub_status": "InTransit_Arrival" },
+      "tracking": {
+          "providers_hash": 1720365811,
+          "providers": [
+            {
+              "provider": { "key": 9201, "name": "India Post", "alias": "India Post", "country": "IN" },
+              "latest_sync_status": "Success",
+              "latest_sync_time": "2026-11-21T04:10:00Z",
+              "events_hash": 913246123,
+              "events": [
+                {
+                  "time_iso": "2026-11-21T09:30:00+05:30",
+                  "time_utc": "2026-11-21T04:00:00Z",
+                  "description": "Item received at delivery office",
+                  "location": "Pune City HO",
+                  "stage": "Arrival",
+                  "sub_status": "InTransit_Arrival"
+                },
+                {
+                  "time_iso": "2026-11-20T18:10:00+05:30",
+                  "time_utc": "2026-11-20T12:40:00Z",
+                  "description": "Item dispatched",
+                  "location": "Mumbai NSH",
+                  "stage": "Departure",
+                  "sub_status": "InTransit_Departure"
+                },
+                {
+                  "time_iso": "2026-11-19T11:00:00+05:30",
+                  "time_utc": "2026-11-19T05:30:00Z",
+                  "description": "Item booked",
+                  "location": "Mumbai GPO",
+                  "stage": "PickedUp",
+                  "sub_status": "InTransit_PickedUp"
+                },
+                {
+                  "time_iso": "2026-11-18T10:00:00+05:30",
+                  "time_utc": null,
+                  "description": "Shipment information received",
+                  "location": "",
+                  "stage": null,
+                  "sub_status": "InfoReceived"
+                }
+              ]
+            }
+          ]
+        }
+    }
+  }
+}

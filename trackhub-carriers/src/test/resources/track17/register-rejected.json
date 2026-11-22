@@ -1,0 +1,12 @@
+{
+  "code": 0,
+  "data": {
+    "accepted": [],
+    "rejected": [
+      {
+        "number": "ZZ000000000XX",
+        "error": { "code": -18019903, "message": "The carrier cannot be detected for this tracking number." }
+      }
+    ]
+  }
+}

@@ -27,7 +27,7 @@ flowchart TB
 | Module | Holds | Depends on |
 | --- | --- | --- |
 | `trackhub-domain` | Business rules in plain Java: shipments, status state machine, ports | JDK only |
-| `trackhub-carriers` | One adapter per carrier | `trackhub-domain` |
+| `trackhub-carriers` | One adapter per carrier (JDK HTTP client + Jackson), tested against WireMock | `trackhub-domain` |
 | `trackhub-app` | Spring Boot: web, persistence, jobs, scheduling | both of the above |
 
 ## Running locally
